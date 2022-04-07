@@ -1,22 +1,18 @@
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-
 import argparse
 import configparser
 import ast
 import tqdm
 import numpy as np
 import torch
-from datasets.movielens import *
-from models.FM import *
-from models.NCF import *
-from models.Wide_Deep import *
-from models.NFM import *
-from models.DeepFM import *
-from models.xDeepFM import *
-from utils.evaluation import *
-from utils.EarlyStopper import *
+from torch_recommenders.datasets.movielens import *
+from torch_recommenders.models.FM import *
+from torch_recommenders.models.NCF import *
+from torch_recommenders.models.Wide_Deep import *
+from torch_recommenders.models.NFM import *
+from torch_recommenders.models.DeepFM import *
+from torch_recommenders.models.xDeepFM import *
+from torch_recommenders.utils.evaluation import *
+from torch_recommenders.utils.EarlyStopper import *
 
 # arguments
 def parse_args():
