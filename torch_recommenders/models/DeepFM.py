@@ -14,9 +14,9 @@ class DeepFactorizationMachineModel(nn.Module):
     def __init__(self, field_dims, embed_dim, mlp_dims, dropout):
         super().__init__()
         self.linear = FeaturesLinear(field_dims)
-        self.fm = FactorizationMachine(reduce_sum=True)
         self.embedding = FeaturesEmbedding(field_dims, embed_dim)
         self.embed_output_dim = len(field_dims) * embed_dim
+        self.fm = FactorizationMachine(reduce_sum=True)
         self.mlp = MultiLayerPerceptron(self.embed_output_dim, mlp_dims, dropout)
 
     def forward(self, x):

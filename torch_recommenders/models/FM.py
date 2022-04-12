@@ -13,8 +13,8 @@ class FactorizationMachineModel(nn.Module):
 
     def __init__(self, field_dims, embed_dim):
         super().__init__()
-        self.embedding = FeaturesEmbedding(field_dims, embed_dim)
         self.linear = FeaturesLinear(field_dims)
+        self.embedding = FeaturesEmbedding(field_dims, embed_dim)
         self.fm = FactorizationMachine(reduce_sum=True)
 
     def forward(self, x):

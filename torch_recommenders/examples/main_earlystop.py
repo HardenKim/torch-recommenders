@@ -165,6 +165,7 @@ if __name__ == '__main__':
                                  weight_decay=float(config_model['weight_decay'])
                                  )
     
+    early_stopper = EarlyStopper(num_trials=2, direction='maximize' ,save_path=f'{args.save_dir}/{args.model}.pt')
     tk0 = tqdm(range(1, args.epochs+1), smoothing=0, mininterval=1.0)
     for epoch in tk0:
         loss = train(model, optimizer, train_data_loader, criterion, device)
@@ -172,6 +173,11 @@ if __name__ == '__main__':
         if epoch % 20 == 0:
             val_metrics = test(model, valid_data_loader, device)
             print(f"[Valid] mAP@K: {val_metrics[0]:.3f}, nDCG@K: {val_metrics[1]:.3f}, Precision@K:{val_metrics[2]:.3f}, Recall@K: {val_metrics[3]:.3f}")
+            if not early_stopper.is_continuable(model, val_metrics[1]):
+                print(f'[Valid] best nDCG@K: {early_stopper.best_metric:.3f}')
+                break
+    else: 
+        print(f'[Valid] best nDCG@K: {early_stopper.best_metric:.3f}')
+    
     tst_metrics = test(model, test_data_loader, device)        
-    print(f"[Test] mAP@K: {tst_metrics[0]:.3f}, nDCG@K: {tst_metrics[1]:.3f}, Precision@K:{tst_metrics[2]:.3f}, Recall@K: {tst_metrics[3]:.3f}")
-      
+    print(f"[Test] mAP@K: {tst_metrics[0]:.3f}, nDCG@K: {tst_metrics[1]:.3f}, Precision@K:{tst_metrics[2]:.3f}, Recall@K: {tst_metrics[3]:.3f}")  

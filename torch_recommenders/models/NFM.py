@@ -13,8 +13,8 @@ class NeuralFactorizationMachineModel(nn.Module):
 
     def __init__(self, field_dims, embed_dim, mlp_dims, dropouts):
         super().__init__()
-        self.embedding = FeaturesEmbedding(field_dims, embed_dim)
         self.linear = FeaturesLinear(field_dims)
+        self.embedding = FeaturesEmbedding(field_dims, embed_dim)
         self.fm = nn.Sequential(
             FactorizationMachine(reduce_sum=False),
             nn.BatchNorm1d(embed_dim),
