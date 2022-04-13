@@ -9,7 +9,7 @@ class MovieLens20M_Data(object):
     """
     
     def __init__(self,
-                 path='../data/ml-1m/ratings.dat',
+                 path='../data/ml-20m/ratings.csv',
                  min_rating=0,
                  max_len=50,
                  num_neg_test=100

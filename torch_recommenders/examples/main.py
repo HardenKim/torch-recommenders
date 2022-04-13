@@ -48,46 +48,60 @@ def parse_args():
     
     return parser.parse_args()
 
-def get_dataset():
-    if args.dataset == 'ml-1m':
+def get_dataset(name):
+    if name == 'ml-1m':
         return MovieLens1M_Dataset(path=config_dataset['path'],
                                    min_rating=int(config_dataset['min_rating']),
                                    num_neg=int(config_dataset['num_neg']),
                                    num_neg_test=int(config_dataset['num_neg_test'])
                                    )
-    elif args.dataset == 'ml-20m':
+    elif name == 'ml-20m':
         return MovieLens20M_Dataset(path=config_dataset['path'],
                                     min_rating=int(config_dataset['min_rating']),
                                     num_neg=int(config_dataset['num_neg']),
                                     num_neg_test=int(config_dataset['num_neg_test'])
                                     )
     else:
-        raise ValueError('unknown dataset name: ' + args.dataset)
+        raise ValueError('unknown dataset name: ' + name)
 
-def get_model(name, field_dims, config):
+def get_model(name, field_dims):
     """
     Hyperparameters are empirically determined, not opitmized.
     """
 
     if name == 'fm':
-        return FactorizationMachineModel(field_dims, embed_dim=16)
+        return FactorizationMachineModel(field_dims,
+                                         embed_dim=int(config_model['embed_dim']))
+    elif name == 'wd':
+        return WideAndDeepModel(field_dims,
+                                embed_dim=int(config_model['embed_dim']), 
+                                mlp_dims=ast.literal_eval(config_model['mlp_dims']), 
+                                dropout=float(config_model['dropout']))
     elif name == 'ncf':
         # only supports MovieLens dataset because for other datasets user/item colums are indistinguishable
-        return NeuralCollaborativeFiltering(field_dims, 
-                                            embed_dim=int(config['embed_dim']), 
-                                            mlp_dims=ast.literal_eval(config['mlp_dims']), 
-                                            dropout=float(config['dropout_rate']))
-    elif name == 'wd':
-        return WideAndDeepModel(field_dims, embed_dim=16, mlp_dims=(16, 16), dropout=0.2)
+        return NeuralCollaborativeFiltering(field_dims,
+                                            embed_dim=int(config_model['embed_dim']),
+                                            mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                            dropout=float(config_model['dropout']))
     elif name == 'nfm':
-        return NeuralFactorizationMachineModel(field_dims, embed_dim=64, mlp_dims=(64,), dropouts=(0.2, 0.2))
+        return NeuralFactorizationMachineModel(field_dims,
+                                               embed_dim=int(config_model['embed_dim']),
+                                               mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                               dropouts=ast.literal_eval(config_model['dropouts']))
     elif name == 'dfm':
-        return DeepFactorizationMachineModel(field_dims, embed_dim=16, mlp_dims=(16, 16), dropout=0.2)
+        return DeepFactorizationMachineModel(field_dims,
+                                            embed_dim=int(config_model['embed_dim']),
+                                            mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                            dropout=float(config_model['dropout']))
     elif name == 'xdfm':
-        return ExtremeDeepFactorizationMachineModel(
-            field_dims, embed_dim=16, cross_layer_sizes=(16, 16), split_half=False, mlp_dims=(16, 16), dropout=0.2)
+        return ExtremeDeepFactorizationMachineModel(field_dims,
+                                                    embed_dim=int(config_model['embed_dim']),
+                                                    mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                                    cross_layer_sizes=ast.literal_eval(config_model['mlp_dims']),
+                                                    dropout=float(config_model['dropout']),
+                                                    split_half=False)
     
-def train(model, optimizer, data_loader, criterion, device, log_interval=100):
+def train(model, optimizer, data_loader, criterion, device):
     model.train()
     total_loss = 0
     total_batch = len(data_loader)
@@ -104,7 +118,8 @@ def train(model, optimizer, data_loader, criterion, device, log_interval=100):
 
 def test(model, data_loader, device):
     model.eval()
-    metrics_k = np.zeros(4, dtype=float) # map, ndcg, precision, recall
+    metrics_k = np.zeros(3, dtype=float) # map, ndcg, hit
+    total_users = len(data_loader)
     with torch.no_grad():
         for fields, target in data_loader:
             fields, target = fields.to(device), target.to(device)
@@ -112,9 +127,9 @@ def test(model, data_loader, device):
             _, indices = torch.topk(predictions, args.top_k)
             recommends = torch.take(fields[:, [1]], indices).cpu().tolist()
             gt_item = fields[0][1].item() # leave one-out evaluation has only one item per user
-            metrics_k += get_metrics_k(gt_item, recommends, len(data_loader))
+            metrics_k += get_metrics_k(gt_item, recommends)
             
-    return metrics_k / len(data_loader)
+    return metrics_k / total_users
 
 
 if __name__ == '__main__':
@@ -131,7 +146,7 @@ if __name__ == '__main__':
     print(f"device: {device}, model: {args.model}, dataset: {args.dataset}, preprocessed_dataset: {args.preprocessed_dataset}")
         
     if not args.preprocessed_dataset:
-        dataset = get_dataset()
+        dataset = get_dataset(args.dataset)
         torch.save(dataset, f"{config_dataset['preprocessed_path']}/dataset.pt")
     else:
         dataset = torch.load(f"{config_dataset['preprocessed_path']}/dataset.pt")
@@ -156,22 +171,29 @@ if __name__ == '__main__':
                                                    num_workers=args.num_workers
                                                    )
     
-    model = get_model(args.model, dataset.field_dims, config_model).to(device)
+    model = get_model(args.model, dataset.field_dims).to(device)
     # print(f"model: \n {model}")
     # print("="*50)
-    criterion = torch.nn.BCELoss()
+    criterion = torch.nn.BCELoss().to(device)
     optimizer = torch.optim.Adam(params=model.parameters(), 
                                  lr=float(config_model['learning_rate']), 
                                  weight_decay=float(config_model['weight_decay'])
                                  )
     
+    # early_stopper = EarlyStopper(num_trials=5, direction='maximize' ,save_path=f'{args.save_dir}/{args.model}.pt')
+    early_stopper = EarlyStopper(num_trials=2, direction='maximize')
     tk0 = tqdm(range(1, args.epochs+1), smoothing=0, mininterval=1.0)
     for epoch in tk0:
         loss = train(model, optimizer, train_data_loader, criterion, device)
         tk0.set_postfix(loss=loss)
-        if epoch % 20 == 0:
-            val_metrics = test(model, valid_data_loader, device)
-            print(f"[Valid] mAP@K: {val_metrics[0]:.3f}, nDCG@K: {val_metrics[1]:.3f}, Precision@K:{val_metrics[2]:.3f}, Recall@K: {val_metrics[3]:.3f}")
-    tst_metrics = test(model, test_data_loader, device)        
-    print(f"[Test] mAP@K: {tst_metrics[0]:.3f}, nDCG@K: {tst_metrics[1]:.3f}, Precision@K:{tst_metrics[2]:.3f}, Recall@K: {tst_metrics[3]:.3f}")
-      
+        if epoch % 10 == 0:
+            metrics = test(model, valid_data_loader, device)
+            print(f"[Valid] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
+            if not early_stopper.is_continuable(model, metrics[1]):
+                print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
+                break
+    else: 
+        print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
+    
+    metrics = test(model, test_data_loader, device)        
+    print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")  

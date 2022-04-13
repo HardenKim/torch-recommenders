@@ -13,7 +13,7 @@ class MovieLens20M_Dataset(Dataset):
     """
     
     def __init__(self,
-                 path='../data/ml-1m/ratings.dat',
+                 path='../data/ml-20m/ratings.csv',
                  min_rating=0,
                  num_neg=4,
                  num_neg_test=100

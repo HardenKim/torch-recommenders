@@ -1,16 +1,15 @@
-import numpy as np
 import torch
 
 
 class PointWiseFeedForward(torch.nn.Module):
-    def __init__(self, hidden_units, dropout_rate):
+    def __init__(self, hidden_units, dropout):
         super(PointWiseFeedForward, self).__init__()
 
         self.conv1 = torch.nn.Conv1d(hidden_units, hidden_units, kernel_size=1)
-        self.dropout1 = torch.nn.Dropout(p=dropout_rate)
+        self.dropout1 = torch.nn.Dropout(p=dropout)
         self.relu = torch.nn.ReLU()
         self.conv2 = torch.nn.Conv1d(hidden_units, hidden_units, kernel_size=1)
-        self.dropout2 = torch.nn.Dropout(p=dropout_rate)
+        self.dropout2 = torch.nn.Dropout(p=dropout)
 
     def forward(self, inputs):
         outputs = self.dropout2(self.conv2(self.relu(self.dropout1(self.conv1(inputs.transpose(-1, -2))))))
@@ -25,7 +24,7 @@ class SASRec(torch.nn.Module):
                  num_items, 
                  hidden_units,
                  max_len,
-                 dropout_rate,
+                 dropout,
                  num_heads,
                  num_blocks,
                  device
@@ -41,7 +40,7 @@ class SASRec(torch.nn.Module):
         # https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
         self.item_emb = torch.nn.Embedding(self.num_items+1, hidden_units, padding_idx=0)
         self.pos_emb = torch.nn.Embedding(max_len, hidden_units) # TO IMPROVE
-        self.emb_dropout = torch.nn.Dropout(p=dropout_rate)
+        self.emb_dropout = torch.nn.Dropout(p=dropout)
 
         self.attention_layernorms = torch.nn.ModuleList() # to be Q for self-attention
         self.attention_layers = torch.nn.ModuleList()
@@ -56,19 +55,19 @@ class SASRec(torch.nn.Module):
 
             new_attn_layer = torch.nn.MultiheadAttention(hidden_units,
                                                          num_heads,
-                                                         dropout_rate)
+                                                         dropout)
             self.attention_layers.append(new_attn_layer)
 
             new_fwd_layernorm = torch.nn.LayerNorm(hidden_units, eps=1e-8)
             self.forward_layernorms.append(new_fwd_layernorm)
 
-            new_fwd_layer = PointWiseFeedForward(hidden_units, dropout_rate)
+            new_fwd_layer = PointWiseFeedForward(hidden_units, dropout)
             self.forward_layers.append(new_fwd_layer)
 
     def log2feats(self, log_seqs):
         seqs = self.item_emb(log_seqs)
         seqs *= self.item_emb.embedding_dim ** 0.5
-        positions = np.tile(np.array(range(log_seqs.shape[1])), [log_seqs.shape[0], 1])
+        positions = torch.tile(torch.arange(log_seqs.shape[1]), [log_seqs.shape[0], 1])
         seqs += self.pos_emb(torch.LongTensor(positions).to(self.dev))
         seqs = self.emb_dropout(seqs)
         

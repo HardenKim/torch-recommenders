@@ -11,7 +11,7 @@ class ExtremeDeepFactorizationMachineModel(nn.Module):
         J Lian, et al. xDeepFM: Combining Explicit and Implicit Feature Interactions for Recommender Systems, 2018.
     """
 
-    def __init__(self, field_dims, embed_dim, mlp_dims, dropout, cross_layer_sizes, split_half=True):
+    def __init__(self, field_dims, embed_dim, mlp_dims, cross_layer_sizes, dropout, split_half=True):
         super().__init__()
         self.linear = FeaturesLinear(field_dims)
         self.embedding = FeaturesEmbedding(field_dims, embed_dim)

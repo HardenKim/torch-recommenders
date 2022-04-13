@@ -43,21 +43,21 @@ def parse_args():
     
     return parser.parse_args()
 
-def get_data():
-    if args.dataset == 'ml-1m':
+def get_data(name):
+    if name == 'ml-1m':
         return MovieLens1M_Data(path=config_dataset['path'],
                                 min_rating=int(config_dataset['min_rating']),
                                 max_len=int(config_dataset['max_len']),
                                 num_neg_test=int(config_dataset['num_neg_test'])
                                 )
-    elif args.dataset == 'ml-20m':
+    elif name == 'ml-20m':
         return MovieLens20M_Data(path=config_dataset['path'],
                                  min_rating=int(config_dataset['min_rating']),
                                  max_len=int(config_dataset['max_len']),
                                  num_neg_test=int(config_dataset['num_neg_test'])
                                  )
     else:
-        raise ValueError('unknown dataset name: ' + args.dataset)
+        raise ValueError('unknown dataset name: ' + name)
 
 def get_model(name, num_users, num_movies, device):
     """
@@ -70,11 +70,11 @@ def get_model(name, num_users, num_movies, device):
                       num_heads=int(config_model['num_heads']),
                       num_blocks=int(config_model['num_blocks']),
                       max_len=int(config_dataset['max_len']),
-                      dropout_rate=float(config_model['dropout_rate']),
+                      dropout=float(config_model['dropout']),
                       device=device
                       )
     
-def train(model, optimizer, data_loader, criterion, device, log_interval=100):
+def train(model, optimizer, data_loader, criterion, device):
     model.train()
     total_loss = 0
     total_batch = len(data_loader)
@@ -97,9 +97,9 @@ def train(model, optimizer, data_loader, criterion, device, log_interval=100):
         
     return total_loss / total_batch
 
-def test(model, data_loader, num_users, device):
+def test(model, data_loader, total_users, device):
     model.eval()
-    metrics_k = np.zeros(4, dtype=float) # map, ndcg, precision, recall
+    metrics_k = np.zeros(3, dtype=float) # map, ndcg, hit
     with torch.no_grad():
         for u, seq, item_idx in data_loader:
             u = u.to(device)
@@ -108,9 +108,9 @@ def test(model, data_loader, num_users, device):
             predictions = -model.predict(u, seq, item_idx) # - for 1st argsort DESC
             for prediction in predictions:
                 rank = prediction.argsort().argmin().item() # rank of index 0
-                metrics_k += get_metrics_k_from_rank(rank, args.top_k, len(data_loader))
+                metrics_k += get_metrics_k_from_rank(rank, args.top_k)
                 
-    return metrics_k / num_users    
+    return metrics_k / total_users
 
 
 if __name__ == '__main__':
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     print(f"device: {device}, model: {args.model}, dataset: {args.dataset}, preprocessed_dataset: {args.preprocessed_dataset}")
         
     if not args.preprocessed_dataset:
-        data = get_data()
+        data = get_data(args.dataset)
         train_dataset = data.get_train_dataset()
         valid_dataset = data.get_valid_dataset()
         test_dataset = data.get_test_dataset()
@@ -164,20 +164,25 @@ if __name__ == '__main__':
             torch.nn.init.xavier_normal_(param.data)
         except:
             pass # just ignore those failed init layers
-    criterion = torch.nn.BCEWithLogitsLoss().to(device)
-    # criterion = torch.nn.BCELoss().to(args.device)
+    criterion = torch.nn.BCEWithLogitsLoss().to(device) # torch.nn.BCELoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=float(config_model['learning_rate']),
                                 betas=ast.literal_eval(config_model['betas'])
                                 )
     
+    early_stopper = EarlyStopper(num_trials=2, direction='maximize')
     tk0 = tqdm(range(1, args.epochs+1), smoothing=0, mininterval=1.0)
     for epoch in tk0:
         loss = train(model, optimizer, train_data_loader, criterion, device)
         tk0.set_postfix(loss=loss)
-        if epoch % 20 == 0:
-            val_metrics = test(model, valid_data_loader, train_dataset.num_users, device)
-            tst_metrics = test(model, test_data_loader, train_dataset.num_users, device)
-            print(f"[Valid] mAP@K: {val_metrics[0]:.3f}, nDCG@K: {val_metrics[1]:.3f}, Precision@K:{val_metrics[2]:.3f}, Recall@K: {val_metrics[3]:.3f}")
-            print(f"[Test] mAP@K: {tst_metrics[0]:.3f}, nDCG@K: {tst_metrics[1]:.3f}, Precision@K:{tst_metrics[2]:.3f}, Recall@K: {tst_metrics[3]:.3f}")
+        if epoch % 10 == 0:
+            metrics = test(model, valid_data_loader, valid_dataset.num_users, device)
+            print(f"[Valid] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
+            if not early_stopper.is_continuable(model, metrics[1]):
+                print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
+                break
+    else: 
+        print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
             
+    metrics = test(model, test_data_loader, test_dataset.num_users, device)
+    print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")

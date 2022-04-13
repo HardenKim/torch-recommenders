@@ -4,17 +4,18 @@ import torch.nn as nn
 from .layer import *
 
 
-class FactorizationMachineModel(nn.Module):
+class FactorizationMachineModel(torch.nn.Module):
     """
     A pytorch implementation of Factorization Machine.
+
     Reference:
         S Rendle, Factorization Machines, 2010.
     """
 
     def __init__(self, field_dims, embed_dim):
         super().__init__()
-        self.linear = FeaturesLinear(field_dims)
         self.embedding = FeaturesEmbedding(field_dims, embed_dim)
+        self.linear = FeaturesLinear(field_dims)
         self.fm = FactorizationMachine(reduce_sum=True)
 
     def forward(self, x):
