@@ -20,10 +20,10 @@ Recommendation System Models by Pytorch
 
 MovieLens(ml-1m) is used as the dataset for model comparision.
 To evaluate the performance of item recommendation, I adopted the `leave-one-out` evaluation, which has been widely used in many literatures (NCF, Wide&Deep, SASRec).
-Use K=10 (top 10 recommendations) for ranking metrics.
+Use k=10 (top 10 recommendations) for ranking metrics.
 The Hyperparameters for each model are in [`model.ini`](https://github.com/HardenKim/torch-recommenders/blob/master/torch_recommenders/config/model.ini).
 
-| Model     | mAP@K | nDCG@k | HR@k  |
+| Model     | mAP@k | nDCG@k | HR@k  |
 |-----------|-------|--------|-------|
 | FM        | 0.306 | 0.390  | 0.664 |
 | Wide&Deep | 0.268 | 0.350  | 0.617 |
