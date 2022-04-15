@@ -11,6 +11,7 @@ import torch
 
 from models.SASRec import *
 from datasets.movielens_sasrec import *
+from datasets.kmrd_sasrec import *
 from utils.evaluation import *
 from utils.EarlyStopper import *
 
@@ -25,7 +26,7 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=2048,
         help='Number of batch size for training.')
     parser.add_argument('--dataset', default='ml-1m',
-        help='kmrd, ml-1m or ml-2m.')
+        help='kmrd-2m, ml-1m or ml-20m.')
     parser.add_argument('--preprocessed_dataset', action='store_true', default=False,
         help=".")
     parser.add_argument('--model', default='sasrec',
@@ -48,14 +49,17 @@ def get_data(name):
         return MovieLens1M_Data(path=config_dataset['path'],
                                 min_rating=int(config_dataset['min_rating']),
                                 max_len=int(config_dataset['max_len']),
-                                num_neg_test=int(config_dataset['num_neg_test'])
-                                )
+                                num_neg_test=int(config_dataset['num_neg_test']))
     elif name == 'ml-20m':
         return MovieLens20M_Data(path=config_dataset['path'],
                                  min_rating=int(config_dataset['min_rating']),
                                  max_len=int(config_dataset['max_len']),
-                                 num_neg_test=int(config_dataset['num_neg_test'])
-                                 )
+                                 num_neg_test=int(config_dataset['num_neg_test']))
+    elif name == 'kmrd-2m':
+        return KMRD2M_Data(path=config_dataset['path'],
+                           min_rating=int(config_dataset['min_rating']),
+                           max_len=int(config_dataset['max_len']),
+                           num_neg_test=int(config_dataset['num_neg_test']))    
     else:
         raise ValueError('unknown dataset name: ' + name)
 
@@ -124,22 +128,14 @@ if __name__ == '__main__':
     config_model = config[args.model]
     
     device = torch.device("cuda:"+args.gpu if not args.no_cuda and torch.cuda.is_available() else "cpu")
-    print(f"device: {device}, model: {args.model}, dataset: {args.dataset}, preprocessed_dataset: {args.preprocessed_dataset}")
+    print(f"device: {device}, model: {args.model}, dataset: {args.dataset}, negative_sampling: {args.negative_sampling}")
         
-    if not args.preprocessed_dataset:
-        data = get_data(args.dataset)
-        train_dataset = data.get_train_dataset()
-        valid_dataset = data.get_valid_dataset()
-        test_dataset = data.get_test_dataset()
-        torch.save(train_dataset, f"{config_dataset['preprocessed_path']}/train_dataset.pt")
-        torch.save(valid_dataset, f"{config_dataset['preprocessed_path']}/valid_dataset.pt")
-        torch.save(test_dataset, f"{config_dataset['preprocessed_path']}/test_dataset.pt")
-    else:
-        train_dataset = torch.load(f"{config_dataset['preprocessed_path']}/train_dataset.pt")
-        valid_dataset = torch.load(f"{config_dataset['preprocessed_path']}/valid_dataset.pt")
-        test_dataset = torch.load(f"{config_dataset['preprocessed_path']}/test_dataset.pt")
-        
+    data = get_data(args.dataset)
+    train_dataset = data.get_train_dataset()
+    valid_dataset = data.get_valid_dataset()
+    test_dataset = data.get_test_dataset()
     print(f"train length: {len(train_dataset)}, valid length: {len(valid_dataset)}, test length: {len(test_dataset)}")
+    
     train_data_loader = torch.utils.data.DataLoader(train_dataset,
                                                     batch_size=args.batch_size,
                                                     shuffle=True,
@@ -176,7 +172,7 @@ if __name__ == '__main__':
         loss = train(model, optimizer, train_data_loader, criterion, device)
         tk0.set_postfix(loss=loss)
         if epoch % 10 == 0:
-            metrics = test(model, valid_data_loader, valid_dataset.num_users, device)
+            metrics = test(model, valid_data_loader, data.num_users, device)
             print(f"[Valid] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
             if not early_stopper.is_continuable(model, metrics[1]):
                 print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
@@ -184,5 +180,5 @@ if __name__ == '__main__':
     else: 
         print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
             
-    metrics = test(model, test_data_loader, test_dataset.num_users, device)
+    metrics = test(model, test_data_loader, data.num_users, device)
     print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")

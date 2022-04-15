@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from torch.utils.data import Subset
 from datasets.movielens import *
+from datasets.kmrd import *
 from models.FM import *
 from models.NCF import *
 from models.Wide_Deep import *
@@ -30,8 +31,8 @@ def parse_args():
     parser.add_argument('--batch_size', type=int, default=2048,
         help='Number of batch size for training.')
     parser.add_argument('--dataset', default='ml-1m',
-        help='kmrd, ml-1m or ml-2m.')
-    parser.add_argument('--preprocessed_dataset', action='store_true', default=False,
+        help='kmrd-2m, ml-1m or ml-20m.')
+    parser.add_argument('--negative_sampling', action='store_false', default=True,
         help=".")
     parser.add_argument('--model', default='ncf',
         help="fm, ncf, wd, nfm, dfm or xdfm.")
@@ -48,19 +49,25 @@ def parse_args():
     
     return parser.parse_args()
 
-def get_dataset(name):
+def get_data(name):
     if name == 'ml-1m':
-        return MovieLens1M_Dataset(path=config_dataset['path'],
-                                   min_rating=int(config_dataset['min_rating']),
-                                   num_neg=int(config_dataset['num_neg']),
-                                   num_neg_test=int(config_dataset['num_neg_test'])
-                                   )
+        return MovieLens1M_Data(path=config_dataset['path'],
+                                min_rating=int(config_dataset['min_rating']),
+                                negative_sampling=args.negative_sampling,
+                                num_neg=int(config_dataset['num_neg']),
+                                num_neg_test=int(config_dataset['num_neg_test']))
     elif name == 'ml-20m':
-        return MovieLens20M_Dataset(path=config_dataset['path'],
-                                    min_rating=int(config_dataset['min_rating']),
-                                    num_neg=int(config_dataset['num_neg']),
-                                    num_neg_test=int(config_dataset['num_neg_test'])
-                                    )
+        return MovieLens20M_Data(path=config_dataset['path'],
+                                 min_rating=int(config_dataset['min_rating']),
+                                 negative_sampling=args.negative_sampling,
+                                 num_neg=int(config_dataset['num_neg']),
+                                 num_neg_test=int(config_dataset['num_neg_test']))
+    elif name == 'kmrd-2m':
+        return KMRD2M_Data(path=config_dataset['path'],
+                           min_rating=int(config_dataset['min_rating']),
+                           negative_sampling=args.negative_sampling,
+                           num_neg=int(config_dataset['num_neg']),
+                           num_neg_test=int(config_dataset['num_neg_test']))
     else:
         raise ValueError('unknown dataset name: ' + name)
 
@@ -78,7 +85,6 @@ def get_model(name, field_dims):
                                 mlp_dims=ast.literal_eval(config_model['mlp_dims']), 
                                 dropout=float(config_model['dropout']))
     elif name == 'ncf':
-        # only supports MovieLens dataset because for other datasets user/item colums are indistinguishable
         return NeuralCollaborativeFiltering(field_dims,
                                             embed_dim=int(config_model['embed_dim']),
                                             mlp_dims=ast.literal_eval(config_model['mlp_dims']),
@@ -90,9 +96,9 @@ def get_model(name, field_dims):
                                                dropouts=ast.literal_eval(config_model['dropouts']))
     elif name == 'dfm':
         return DeepFactorizationMachineModel(field_dims,
-                                            embed_dim=int(config_model['embed_dim']),
-                                            mlp_dims=ast.literal_eval(config_model['mlp_dims']),
-                                            dropout=float(config_model['dropout']))
+                                             embed_dim=int(config_model['embed_dim']),
+                                             mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                             dropout=float(config_model['dropout']))
     elif name == 'xdfm':
         return ExtremeDeepFactorizationMachineModel(field_dims,
                                                     embed_dim=int(config_model['embed_dim']),
@@ -106,7 +112,7 @@ def train(model, optimizer, data_loader, criterion, device):
     total_loss = 0
     total_batch = len(data_loader)
     for fields, target in data_loader:
-        fields, target = fields.to(device), target.to(device)
+        fields, target = fields.view(-1,2).to(device), target.view(-1).to(device)
         y = model(fields)
         loss = criterion(y, target.float())
         model.zero_grad()
@@ -116,13 +122,12 @@ def train(model, optimizer, data_loader, criterion, device):
         
     return total_loss / total_batch
 
-def test(model, data_loader, device):
+def test(model, data_loader, total_users, device):
     model.eval()
     metrics_k = np.zeros(3, dtype=float) # map, ndcg, hit
-    total_users = len(data_loader)
     with torch.no_grad():
         for fields, target in data_loader:
-            fields, target = fields.to(device), target.to(device)
+            fields, target = fields.view(-1,2).to(device), target.view(-1).to(device)
             predictions = model(fields)
             _, indices = torch.topk(predictions, args.top_k)
             recommends = torch.take(fields[:, [1]], indices).cpu().tolist()
@@ -143,42 +148,40 @@ if __name__ == '__main__':
     config_model = config[args.model]
     
     device = torch.device("cuda:"+args.gpu if not args.no_cuda and torch.cuda.is_available() else "cpu")
-    print(f"device: {device}, model: {args.model}, dataset: {args.dataset}, preprocessed_dataset: {args.preprocessed_dataset}")
+    print(f"device: {device}, model: {args.model}, dataset: {args.dataset}, negative_sampling: {args.negative_sampling}")
         
-    if not args.preprocessed_dataset:
-        dataset = get_dataset(args.dataset)
-        torch.save(dataset, f"{config_dataset['preprocessed_path']}/dataset.pt")
-    else:
-        dataset = torch.load(f"{config_dataset['preprocessed_path']}/dataset.pt")
-        
-    train_dataset = Subset(dataset, dataset.train_index)
-    valid_dataset = Subset(dataset, dataset.valid_index)
-    test_dataset = Subset(dataset, dataset.test_index)
+    data = get_data(args.dataset)
+    train_dataset = data.get_train_dataset()
+    valid_dataset = data.get_valid_dataset()
+    test_dataset = data.get_test_dataset()
     print(f"train length: {len(train_dataset)}, valid length: {len(valid_dataset)}, test length: {len(test_dataset)}")
-    train_data_loader = torch.utils.data.DataLoader(train_dataset, 
-                                                    batch_size=args.batch_size,
-                                                    shuffle=True, 
-                                                    num_workers=args.num_workers
-                                                    )
-    valid_data_loader = torch.utils.data.DataLoader(valid_dataset, 
-                                                    batch_size=int(config_dataset['num_neg_test']) + 1, 
-                                                    shuffle=False, 
-                                                    num_workers=args.num_workers
-                                                    )
-    test_data_loader = torch.utils.data.DataLoader(test_dataset, 
-                                                   batch_size=int(config_dataset['num_neg_test']) + 1,
-                                                   shuffle=False, 
-                                                   num_workers=args.num_workers
-                                                   )
     
-    model = get_model(args.model, dataset.field_dims).to(device)
+    if args.negative_sampling:
+        train_batch_size = args.batch_size // (int(config_dataset['num_neg']) + 1)
+        test_batch_size = 1
+    else:
+        train_batch_size = args.batch_size
+        test_batch_size = int(config_dataset['num_neg']) + 1
+    train_data_loader = torch.utils.data.DataLoader(train_dataset,
+                                                    batch_size=train_batch_size,
+                                                    shuffle=True, 
+                                                    num_workers=args.num_workers)                                                    
+    valid_data_loader = torch.utils.data.DataLoader(valid_dataset, 
+                                                    batch_size=test_batch_size, # (num_neg_test + 1)
+                                                    shuffle=False, 
+                                                    num_workers=args.num_workers)
+    test_data_loader = torch.utils.data.DataLoader(test_dataset,  
+                                                    batch_size=test_batch_size, # (num_neg_test + 1)
+                                                    shuffle=False, 
+                                                    num_workers=args.num_workers)
+    
+    model = get_model(args.model, data.field_dims).to(device)
     # print(f"model: \n {model}")
     # print("="*50)
     criterion = torch.nn.BCELoss().to(device)
     optimizer = torch.optim.Adam(params=model.parameters(), 
                                  lr=float(config_model['learning_rate']), 
-                                 weight_decay=float(config_model['weight_decay'])
-                                 )
+                                 weight_decay=float(config_model['weight_decay']))
     
     # early_stopper = EarlyStopper(num_trials=5, direction='maximize' ,save_path=f'{args.save_dir}/{args.model}.pt')
     early_stopper = EarlyStopper(num_trials=2, direction='maximize')
@@ -187,7 +190,7 @@ if __name__ == '__main__':
         loss = train(model, optimizer, train_data_loader, criterion, device)
         tk0.set_postfix(loss=loss)
         if epoch % 10 == 0:
-            metrics = test(model, valid_data_loader, device)
+            metrics = test(model, valid_data_loader, data.num_users, device)
             print(f"[Valid] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
             if not early_stopper.is_continuable(model, metrics[1]):
                 print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
@@ -195,5 +198,5 @@ if __name__ == '__main__':
     else: 
         print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
     
-    metrics = test(model, test_data_loader, device)        
+    metrics = test(model, test_data_loader, data.num_users, device)        
     print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")  

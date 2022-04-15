@@ -23,15 +23,19 @@ To evaluate the performance of item recommendation, I adopted the `leave-one-out
 Use k=10 (top 10 recommendations) for ranking metrics.
 The Hyperparameters for each model are in [`model.ini`](https://github.com/HardenKim/torch-recommenders/blob/master/torch_recommenders/config/model.ini).
 
+### MovieLens-1m
+
 | Model     | mAP@k | nDCG@k | HR@k  |
 |-----------|-------|--------|-------|
-| FM        | 0.306 | 0.390  | 0.664 |
+| FM        | 0.316 | 0.402  | 0.684 |
 | Wide&Deep | 0.268 | 0.350  | 0.617 |
 | NCF       | 0.297 | 0.380  | 0.650 |
 | NFM       | 0.289 | 0.372  | 0.642 |
 | DeepFM    | 0.298 | 0.383  | 0.658 |
 | xDeepFM   | 0.287 | 0.372  | 0.648 |
 | SASRec    | 0.478 | 0.554  | 0.797 |
+
+
 
 ## Examples
 

@@ -1,15 +1,16 @@
 import random
 import numpy as np 
 import pandas as pd
+from collections import defaultdict
 from torch.utils.data import Dataset
 
-class MovieLens20M_Data(object):
+class MovieLens1M_Data(object):
     """
     Preprocessing for MovieLens
     """
     
     def __init__(self,
-                 path='../data/ml-20m/ratings.csv',
+                 path='../data/ml-1m/ratings.dat',
                  min_rating=0,
                  max_len=50,
                  num_neg_test=100
@@ -19,19 +20,22 @@ class MovieLens20M_Data(object):
         self.min_rating = min_rating
         self.max_len = max_len
         self.num_neg_test = num_neg_test
-        self.users = None
-        self.num_users = None
-        self.num_movies = None
-        self.negative_items = None
-        self.train_seq = None
-        self.valid_seq = None
-        self.test_seq = None
         
-        self._preprocessing()
-    
-    def _load_data(self, sep=',', engine='c', header='infer'):
-        return pd.read_csv(self.path, sep=sep, engine=engine, header=header)
+        data = self._load_data()
+        data = self._reindex(data)
+        data = self._preprocess_target(data)
+        
+        self.users = data['userId'].unique()
+        self.movies = data['movieId'].unique()
+        self.num_users = data['userId'].nunique()
+        self.num_movies = data['movieId'].nunique()
+        self.positive_items = self._get_positive_items(data) # include valid, test data 
+        self.train_seq, self.valid_seq, self.test_seq = self._get_sequences(data)
 
+    def _load_data(self, sep='::', engine='python', header=None):
+        names = ['userId', 'movieId', 'rating', 'timestamp']
+        return pd.read_csv(self.path, sep=sep, engine=engine, header=header, names=names)  
+    
     def _reindex(selef, data):
         """
         Process dataset to reindex userId and movieId
@@ -63,94 +67,80 @@ class MovieLens20M_Data(object):
         valid = data.loc[data['rank_latest'] == 2]
         test = data.loc[data['rank_latest'] == 1]
         assert train['userId'].nunique()==valid['userId'].nunique()==test['userId'].nunique(), 'Not Match Train User, Valid User with Test User'
-        return train, valid, test
-
-    def _get_negative_items(self, data):
-        interact_status = (
-            data.groupby('userId')['movieId']
-            .apply(set)
-            .reset_index()
-            .rename(columns={'movieId': 'interacted_items'}))
-        item_pool = set(data['movieId'].unique())
-        return interact_status['interacted_items'].apply(lambda x: item_pool - x).to_dict()
-
-    def _preprocessing(self): 
-        data = self._load_data()
-        data = self._reindex(data)
-        data = self._preprocess_target(data)
+        return train.iloc[:,:2], valid.iloc[:,:2], test.iloc[:,:2]
+    
+    def _get_sequences(self, data):
+        train_seq = defaultdict(list)
+        valid_seq = defaultdict(list)
+        test_seq = defaultdict(list)
+        
         train_data, valid_data, test_data = self._leave_one_out(data)
         
-        self.users = data['userId'].unique()
-        self.num_users = data['userId'].nunique()
-        self.num_movies = data['movieId'].nunique()
-        self.negative_items = self._get_negative_items(data)
-        self.train_seq = train_data.groupby('userId')['movieId'].apply(np.array).to_dict()
-        self.valid_seq = valid_data.groupby('userId')['movieId'].apply(np.array).to_dict()
-        self.test_seq = test_data.groupby('userId')['movieId'].apply(np.array).to_dict()
+        for row in train_data.itertuples():
+            train_seq[row.userId].append(row.movieId)
+        for row in valid_data.itertuples():
+            valid_seq[row.userId].append(row.movieId)
+        for row in test_data.itertuples():
+            test_seq[row.userId].append(row.movieId)
         
+        return train_seq, valid_seq, test_seq
+    
+    def _get_positive_items(self, data):
+        positive_items = defaultdict(set)
+        for row in data.itertuples():
+            positive_items[row.userId].add(row.movieId)
+        return positive_items
+    
     def get_train_dataset(self):
-        return MovieLens_Train_Dataset(users=self.users,
-                                       num_users=self.num_users,
-                                       num_movies=self.num_movies,
-                                       negative_items=self.negative_items,
-                                       train_sequences=self.train_seq,
-                                       max_len=self.max_len
+        return Train_Dataset(users=self.users,
+                             movies=self.movies,
+                             positive_items=self.positive_items,
+                             train_sequences=self.train_seq,
+                             max_len=self.max_len
         )
         
     def get_valid_dataset(self):
-        return MovieLens_Valid_Dataset(users=self.users,
-                                       num_users=self.num_users,
-                                       num_movies=self.num_movies,
-                                       negative_items=self.negative_items,
-                                       train_sequences=self.train_seq,
-                                       valid_sequences=self.valid_seq,
-                                       max_len=self.max_len,
-                                       num_neg_test=self.num_neg_test
+        return Valid_Dataset(users=self.users,
+                             movies=self.movies,
+                             positive_items=self.positive_items,
+                             train_sequences=self.train_seq,
+                             valid_sequences=self.valid_seq,
+                             max_len=self.max_len,
+                             num_neg_test=self.num_neg_test
         )
     
     def get_test_dataset(self):
-        return MovieLens_Test_Dataset(users=self.users,
-                                      num_users=self.num_users,
-                                      num_movies=self.num_movies,
-                                      negative_items=self.negative_items,
-                                      train_sequences=self.train_seq,
-                                      valid_sequences=self.valid_seq,
-                                      test_sequences=self.test_seq,
-                                      max_len=self.max_len,
-                                      num_neg_test=self.num_neg_test
+        return Test_Dataset(users=self.users,
+                            movies=self.movies,
+                            positive_items=self.positive_items,
+                            train_sequences=self.train_seq,
+                            valid_sequences=self.valid_seq,
+                            test_sequences=self.test_seq,
+                            max_len=self.max_len,
+                            num_neg_test=self.num_neg_test
         )
          
              
-class MovieLens1M_Data(MovieLens20M_Data):
-    """
-    MovieLens 1M Dataset
-    Data preparation
-        treat samples with a rating less than 3 as negative samples
-    :param dataset_path: MovieLens dataset path
-    Reference:
-        https://grouplens.org/datasets/movielens
-    """
+class MovieLens20M_Data(MovieLens1M_Data):
     
     def __init__(self,
-                 path='../data/ml-1m/ratings.dat',
+                 path='../data/ml-20m/ratings.csv',
                  min_rating=0,
                  max_len=50,
                  num_neg_test=100
                  ):
         super().__init__(path, min_rating, max_len, num_neg_test)
+    
+    def _load_data(self, sep=',', engine='c', header='infer'):
+        return pd.read_csv(self.path, sep=sep, engine=engine, header=header)      
 
-    def _load_data(self, sep='::', engine='python', header=None):
-        names = ['userId', 'movieId', 'rating', 'timestamp']
-        return pd.read_csv(self.path, sep=sep, engine=engine, header=header, names=names)        
 
-
-class MovieLens_Train_Dataset(Dataset):
+class Train_Dataset(Dataset):
     
     def __init__(self,
                  users,
-                 num_users,
-                 num_movies,
-                 negative_items,
+                 movies,
+                 positive_items,
                  train_sequences,
                  valid_sequences=None,
                  test_sequences=None,
@@ -159,9 +149,8 @@ class MovieLens_Train_Dataset(Dataset):
                  ):
         
         self.users = users
-        self.num_users = num_users
-        self.num_movies = num_movies
-        self.negative_items = negative_items
+        self.movies = movies
+        self.positive_items = positive_items
         self.train_sequences = train_sequences
         self.valid_sequences = valid_sequences        
         self.test_sequences = test_sequences
@@ -197,25 +186,24 @@ class MovieLens_Train_Dataset(Dataset):
             seq[-len(sequence)+1:] = sequence[:-1]
             pos[-len(sequence)+1:] = sequence[1:]
             
-        neg[:] = random.sample(self.negative_items[user], self.max_len)
+        neg[:] = random.sample(set(self.movies) - self.positive_items[user], self.max_len)
         
         return user, seq, pos, neg
         
         
-class MovieLens_Valid_Dataset(MovieLens_Train_Dataset):
+class Valid_Dataset(Train_Dataset):
     
     def __init__(self,
                  users,
-                 num_users,
-                 num_movies,
-                 negative_items,
+                 movies,
+                 positive_items,
                  train_sequences,
                  valid_sequences=None,
                  test_sequences=None,
                  max_len=50,
                  num_neg_test=100
                  ):
-        super().__init__(users, num_users, num_movies ,negative_items, train_sequences, valid_sequences, test_sequences, max_len, num_neg_test)
+        super().__init__(users, movies ,positive_items, train_sequences, valid_sequences, test_sequences, max_len, num_neg_test)
 
     def __getitem__(self, index):
         user = self.users[index]
@@ -229,25 +217,24 @@ class MovieLens_Valid_Dataset(MovieLens_Train_Dataset):
             seq[-len(sequence):] = sequence[:]
             
         item_idx[0] = self.valid_sequences[user][0]
-        item_idx[1:] = random.sample(self.negative_items[user], self.num_neg_test)
+        item_idx[1:] = random.sample(set(self.movies) - self.positive_items[user], self.num_neg_test)
         
         return user, seq, item_idx
 
         
-class MovieLens_Test_Dataset(MovieLens_Train_Dataset):
+class Test_Dataset(Train_Dataset):
     
     def __init__(self,
                  users,
-                 num_users,
-                 num_movies,
-                 negative_items,
+                 movies,
+                 positive_items,
                  train_sequences,
                  valid_sequences=None,
                  test_sequences=None,
                  max_len=50,
                  num_neg_test=100
                  ):
-        super().__init__(users, num_users, num_movies, negative_items, train_sequences, valid_sequences, test_sequences, max_len, num_neg_test)
+        super().__init__(users, movies, positive_items, train_sequences, valid_sequences, test_sequences, max_len, num_neg_test)
 
     def __getitem__(self, index):
         user = self.users[index]
@@ -262,7 +249,7 @@ class MovieLens_Test_Dataset(MovieLens_Train_Dataset):
             seq[-len(sequence)-1:-1] = sequence[:]
     
         item_idx[0] = self.test_sequences[user][0]
-        item_idx[1:] = random.sample(self.negative_items[user], self.num_neg_test)
+        item_idx[1:] = random.sample(set(self.movies) - self.positive_items[user], self.num_neg_test)
         
         return user, seq, item_idx
         
