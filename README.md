@@ -4,7 +4,7 @@ Recommendation System Models by Pytorch
 
 ## Models
 
-|model|paper|
+|Model|Paper|
 |------|---|
 |Factorization Machine|[S Rendle, "Factorization Machines", 2010.](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf)|
 |Wide&Deep|[HT Cheng, et al. "Wide & Deep Learning for Recommender Systems", 2016.](https://arxiv.org/abs/1606.07792)|
@@ -28,14 +28,19 @@ The Hyperparameters for each model are in [`model.ini`](https://github.com/Harde
 | Model     | mAP@k | nDCG@k | HR@k  |
 |-----------|-------|--------|-------|
 | FM        | 0.316 | 0.402  | 0.684 |
-| Wide&Deep | 0.268 | 0.350  | 0.617 |
-| NCF       | 0.297 | 0.380  | 0.650 |
-| NFM       | 0.289 | 0.372  | 0.642 |
-| DeepFM    | 0.298 | 0.383  | 0.658 |
-| xDeepFM   | 0.287 | 0.372  | 0.648 |
+| Wide&Deep | 0.272 | 0.351  | 0.612 |
+| NCF       | 0.312 | 0.396  | 0.667 |
+| NFM       | 0.304 | 0.390  | 0.671 |
+| DeepFM    | 0.316 | 0.401  | 0.677 |
+| xDeepFM   | 0.310 | 0.395  | 0.669 |
 | SASRec    | 0.478 | 0.554  | 0.797 |
 
 
+### KMRD-2m
+
+| Model     | mAP@k | nDCG@k | HR@k  |
+|-----------|-------|--------|-------|
+| SASRec    | 0.757 | 0.805  | 0.955 |
 
 ## Examples
 

@@ -74,6 +74,20 @@ class MovieLens1M_Data(object):
         assert train['userId'].nunique()==valid['userId'].nunique()==test['userId'].nunique(), 'Not Match Train User, Valid User with Test User'
         return train.iloc[:,:3].to_numpy(), valid.iloc[:,:3].to_numpy(), test.iloc[:,:3].to_numpy()
     
+    def _leave_one_out(self, data):
+        """
+        leave-one-out evaluation protocol in paper https://www.comp.nus.edu.sg/~xiangnan/papers/ncf.pdf
+        """
+        data['rank_latest'] = data.groupby(['userId'])['timestamp'].rank(method='first', ascending=False).astype(int)
+        train = data.loc[data['rank_latest'] > 2]
+        valid = data.loc[data['rank_latest'] == 2]
+        test = data.loc[data['rank_latest'] == 1]
+        assert train['userId'].nunique()==valid['userId'].nunique()==test['userId'].nunique(), 'Not Match Train User, Valid User with Test User'
+        return train.iloc[:,:3].to_numpy(), valid.iloc[:,:3].to_numpy(), test.iloc[:,:3].to_numpy()
+    
+    
+    
+    
     def _get_positive_items(self, data):
         positive_items = defaultdict(set)
         for row in data.itertuples():

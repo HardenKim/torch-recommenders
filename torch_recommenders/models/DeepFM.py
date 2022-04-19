@@ -1,3 +1,6 @@
+# Original codes are from
+# https://github.com/rixwew/pytorch-fm/blob/master/torchfm/model/dfm.py
+
 import torch
 import torch.nn as nn
 

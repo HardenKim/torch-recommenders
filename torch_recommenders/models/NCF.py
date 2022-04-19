@@ -1,3 +1,6 @@
+# Original codes are from
+# https://github.com/rixwew/pytorch-fm/blob/master/torchfm/model/ncf.py
+
 import torch
 import torch.nn as nn
 
@@ -25,8 +28,8 @@ class NeuralCollaborativeFiltering(nn.Module):
         x = self.embedding(x)
         user_x = x[:, 0] # x[:, [0]].squeeze(1)
         item_x = x[:, 1] # x[:, [1]].squeeze(1)
-        x = self.mlp(x.view(-1, self.embed_output_dim))
         gmf = user_x * item_x
+        x = self.mlp(x.view(-1, self.embed_output_dim))
         x = torch.cat([gmf, x], dim=1)
         x = self.fc(x).squeeze(1)
         return torch.sigmoid(x)

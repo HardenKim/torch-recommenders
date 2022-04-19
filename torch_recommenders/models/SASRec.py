@@ -1,15 +1,19 @@
+# Original codes are from
+# https://github.com/pmixer/SASRec.pytorch/blob/master/model.py
+
+
 import torch
+import torch.nn as nn
 
-
-class PointWiseFeedForward(torch.nn.Module):
+class PointWiseFeedForward(nn.Module):
     def __init__(self, hidden_units, dropout):
         super(PointWiseFeedForward, self).__init__()
 
-        self.conv1 = torch.nn.Conv1d(hidden_units, hidden_units, kernel_size=1)
-        self.dropout1 = torch.nn.Dropout(p=dropout)
-        self.relu = torch.nn.ReLU()
-        self.conv2 = torch.nn.Conv1d(hidden_units, hidden_units, kernel_size=1)
-        self.dropout2 = torch.nn.Dropout(p=dropout)
+        self.conv1 = nn.Conv1d(hidden_units, hidden_units, kernel_size=1)
+        self.dropout1 = nn.Dropout(p=dropout)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv1d(hidden_units, hidden_units, kernel_size=1)
+        self.dropout2 = nn.Dropout(p=dropout)
 
     def forward(self, inputs):
         outputs = self.dropout2(self.conv2(self.relu(self.dropout1(self.conv1(inputs.transpose(-1, -2))))))
@@ -18,7 +22,7 @@ class PointWiseFeedForward(torch.nn.Module):
         return outputs
 
 
-class SASRec(torch.nn.Module):
+class SASRec(nn.Module):
     def __init__(self, 
                  num_users, 
                  num_items, 
@@ -38,27 +42,27 @@ class SASRec(torch.nn.Module):
 
         # TODO: loss += args.l2_emb for regularizing embedding vectors during training
         # https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
-        self.item_emb = torch.nn.Embedding(self.num_items+1, hidden_units, padding_idx=0)
-        self.pos_emb = torch.nn.Embedding(max_len, hidden_units) # TO IMPROVE
-        self.emb_dropout = torch.nn.Dropout(p=dropout)
+        self.item_emb = nn.Embedding(self.num_items+1, hidden_units, padding_idx=0)
+        self.pos_emb = nn.Embedding(max_len, hidden_units) # TO IMPROVE
+        self.emb_dropout = nn.Dropout(p=dropout)
 
-        self.attention_layernorms = torch.nn.ModuleList() # to be Q for self-attention
-        self.attention_layers = torch.nn.ModuleList()
-        self.forward_layernorms = torch.nn.ModuleList()
-        self.forward_layers = torch.nn.ModuleList()
+        self.attention_layernorms = nn.ModuleList() # to be Q for self-attention
+        self.attention_layers = nn.ModuleList()
+        self.forward_layernorms = nn.ModuleList()
+        self.forward_layers = nn.ModuleList()
 
-        self.last_layernorm = torch.nn.LayerNorm(hidden_units, eps=1e-8)
+        self.last_layernorm = nn.LayerNorm(hidden_units, eps=1e-8)
 
         for _ in range(num_blocks):
-            new_attn_layernorm = torch.nn.LayerNorm(hidden_units, eps=1e-8)
+            new_attn_layernorm = nn.LayerNorm(hidden_units, eps=1e-8)
             self.attention_layernorms.append(new_attn_layernorm)
 
-            new_attn_layer = torch.nn.MultiheadAttention(hidden_units,
+            new_attn_layer = nn.MultiheadAttention(hidden_units,
                                                          num_heads,
                                                          dropout)
             self.attention_layers.append(new_attn_layer)
 
-            new_fwd_layernorm = torch.nn.LayerNorm(hidden_units, eps=1e-8)
+            new_fwd_layernorm = nn.LayerNorm(hidden_units, eps=1e-8)
             self.forward_layernorms.append(new_fwd_layernorm)
 
             new_fwd_layer = PointWiseFeedForward(hidden_units, dropout)

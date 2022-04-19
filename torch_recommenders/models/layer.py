@@ -1,3 +1,6 @@
+# Original codes are from
+# https://github.com/rixwew/pytorch-fm/blob/master/torchfm/layer.py
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,8 +10,8 @@ class FeaturesLinear(nn.Module):
     
     def __init__(self, field_dims, output_dim=1):
         super().__init__()
-        self.fc = torch.nn.Embedding(sum(field_dims), output_dim)
-        self.bias = torch.nn.Parameter(torch.zeros((output_dim,)))
+        self.fc = nn.Embedding(sum(field_dims), output_dim)
+        self.bias = nn.Parameter(torch.zeros((output_dim,)))
         self.offsets = np.array((0, *np.cumsum(field_dims)[:-1]), dtype=np.long)
 
     def forward(self, x):
@@ -23,9 +26,9 @@ class FeaturesEmbedding(nn.Module):
 
     def __init__(self, field_dims, embed_dim):
         super().__init__()
-        self.embedding = torch.nn.Embedding(sum(field_dims), embed_dim)
+        self.embedding = nn.Embedding(sum(field_dims), embed_dim)
         self.offsets = np.array((0, *np.cumsum(field_dims)[:-1]), dtype=np.long)
-        torch.nn.init.xavier_uniform_(self.embedding.weight.data)
+        nn.init.xavier_uniform_(self.embedding.weight.data)
 
     def forward(self, x):
         """
