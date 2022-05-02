@@ -31,7 +31,7 @@ The Hyperparameters for each model are in [`model.ini`](https://github.com/Harde
 | Wide&Deep | 0.272 | 0.351  | 0.612 |
 | NCF       | 0.312 | 0.396  | 0.667 |
 | NFM       | 0.304 | 0.390  | 0.671 |
-| DeepFM    | 0.316 | 0.401  | 0.677 |
+| DeepFM    | 0.317 | 0.402  | 0.678 |
 | xDeepFM   | 0.310 | 0.395  | 0.669 |
 | SASRec    | 0.478 | 0.554  | 0.797 |
 
