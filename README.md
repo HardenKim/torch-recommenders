@@ -50,8 +50,8 @@ The Hyperparameters for each model are in [`model.ini`](https://github.com/Harde
   ```python main.py --model=wd --dataset=ml-1m --top_k=10```
 - DeepFM
   ```python main.py --model=dfm --dataset=ml-1m --top_k=10```
-- NCF
-  ```python main.py --model=ncf --dataset=ml-1m --top_k=10```
+- NMF
+  ```python main.py --model=nmf --dataset=ml-1m --top_k=10```
 - SASRec
   ```python main_sasrec.py --model=sasrec --dataset=ml-1m --top_k=10```
 

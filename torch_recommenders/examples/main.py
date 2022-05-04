@@ -12,7 +12,7 @@ import torch
 from datasets.movielens import *
 from datasets.kmrd import *
 from models.FM import *
-from models.NCF import *
+from models.NMF import *
 from models.Wide_Deep import *
 from models.DeepFM import *
 from models.FFM import *
@@ -93,11 +93,11 @@ def get_model(name, field_dims):
                                              embed_dim=int(config_model['embed_dim']),
                                              mlp_dims=ast.literal_eval(config_model['mlp_dims']),
                                              dropout=float(config_model['dropout']))
-    elif name == 'ncf':
-        return NeuralCollaborativeFiltering(field_dims,
-                                            embed_dim=int(config_model['embed_dim']),
-                                            mlp_dims=ast.literal_eval(config_model['mlp_dims']),
-                                            dropout=float(config_model['dropout']))
+    elif name == 'nmf':
+        return NeuralMatrixFactorization(field_dims,
+                                         embed_dim=int(config_model['embed_dim']),
+                                         mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                         dropout=float(config_model['dropout']))
         
 def train(model, optimizer, data_loader, criterion, device):
     model.train()

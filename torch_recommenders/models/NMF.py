@@ -7,7 +7,7 @@ import torch.nn as nn
 from .layer import *
 
 
-class NeuralCollaborativeFiltering(nn.Module):
+class NeuralMatrixFactorization(nn.Module):
     """
     A pytorch implementation of Neural Collaborative Filtering.
     Reference:
