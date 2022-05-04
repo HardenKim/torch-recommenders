@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument('--negative_sampling', action='store_false', default=True,
         help=".")
     parser.add_argument('--model', default='ncf',
-        help="fm, ncf, wd, nfm, dfm or xdfm.")
+        help="fm, ffm, wd, dfm or nmf.")
     parser.add_argument('--pretrained_model', action='store_true', default=False,
         help=".")
     parser.add_argument("--top_k", type=int, default=10, 
