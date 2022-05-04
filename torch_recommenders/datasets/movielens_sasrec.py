@@ -4,6 +4,7 @@ import pandas as pd
 from collections import defaultdict
 from torch.utils.data import Dataset
 
+
 class MovieLens1M_Data(object):
     """
     Preprocessing for MovieLens
@@ -218,6 +219,7 @@ class Valid_Dataset(Train_Dataset):
             
         item_idx[0] = self.valid_sequences[user][0]
         item_idx[1:] = random.sample(set(self.movies) - self.positive_items[user], self.num_neg_test)
+        
         
         return user, seq, item_idx
 

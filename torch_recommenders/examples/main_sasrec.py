@@ -27,6 +27,8 @@ def parse_args():
         help='Number of batch size for training.')
     parser.add_argument('--dataset', default='ml-1m',
         help='kmrd-2m, ml-1m or ml-20m.')
+    parser.add_argument('--negative_sampling', action='store_false', default=True,
+        help=".")
     parser.add_argument('--preprocessed_dataset', action='store_true', default=False,
         help=".")
     parser.add_argument('--model', default='sasrec',
@@ -41,6 +43,8 @@ def parse_args():
         help='Disables CUDA training.')
     parser.add_argument("--gpu", type=str, default="0",
         help="GPU Card ID.")
+    parser.add_argument("--save_dir", type=str, default="best_model",
+        help=".")
     
     return parser.parse_args()
 
@@ -152,7 +156,7 @@ if __name__ == '__main__':
                                                    num_workers=args.num_workers
                                                    )
     
-    model = get_model(args.model, train_dataset.num_users, train_dataset.num_movies, device).to(device)
+    model = get_model(args.model, data.num_users, data.num_movies, device).to(device)
     # print(f"model: \n {model}")
     # print("="*50)
     for name, param in model.named_parameters():
@@ -166,19 +170,17 @@ if __name__ == '__main__':
                                 betas=ast.literal_eval(config_model['betas'])
                                 )
     
-    early_stopper = EarlyStopper(num_trials=2, direction='maximize')
+    early_stopper = EarlyStopper(num_trials=5, direction='maximize', save_path=f'{args.save_dir}/{args.model}.pt')
     tk0 = tqdm(range(1, args.epochs+1), smoothing=0, mininterval=1.0)
     for epoch in tk0:
         loss = train(model, optimizer, train_data_loader, criterion, device)
         tk0.set_postfix(loss=loss)
+        metrics = test(model, valid_data_loader, data.num_users, device)
+        if not early_stopper.is_continuable(model, metrics[1]):
+            break
         if epoch % 10 == 0:
-            metrics = test(model, valid_data_loader, data.num_users, device)
             print(f"[Valid] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
-            if not early_stopper.is_continuable(model, metrics[1]):
-                print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
-                break
-    else: 
-        print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
-            
+    print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
+    model = torch.load(f'{args.save_dir}/{args.model}.pt')
     metrics = test(model, test_data_loader, data.num_users, device)
     print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")

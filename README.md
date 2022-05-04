@@ -7,12 +7,11 @@ Recommendation System Models by Pytorch
 |Model|Paper|
 |------|---|
 |Factorization Machine|[S Rendle, "Factorization Machines", 2010.](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf)|
+|Field-aware Factorization Machines|[Y Juan, et al. "Field-aware Factorization Machines for CTR Prediction", 2015.](https://www.csie.ntu.edu.tw/~cjlin/papers/ffm.pdf)|
 |Wide&Deep|[HT Cheng, et al. "Wide & Deep Learning for Recommender Systems", 2016.](https://arxiv.org/abs/1606.07792)|
-|Neural Collaborative Filtering|[He, Xiangnan, et al. "Neural collaborative filtering", 2017.](https://dl.acm.org/doi/pdf/10.1145/3038912.3052569?casa_token=oEkUs-uK75EAAAAA:UAomJ1kzS9s3Mo8tTg7eoOmZo713fSxhr1wdX9i56MHZ-foO1WfEfHIkCVcw_T464oERdPbFm6sJdPs)|
-|Neural Factorization Machine|[X He and TS Chua. "Neural Factorization Machines for Sparse Predictive Analytics", 2017.](https://arxiv.org/abs/1708.05027)|
 |DeepFM|[H Guo, et al. "DeepFM: A Factorization-Machine based Neural Network for CTR Prediction", 2017.](https://arxiv.org/abs/1703.04247)|
-|xDeepFM|[J Lian, et al. "xDeepFM: Combining Explicit and Implicit Feature Interactions for Recommender Systems", 2018.](https://arxiv.org/abs/1803.05170)|
 |GCN|[Kipf & Welling. "Semi-Supervised Classification with Graph Convolutional Networks", 2016.](https://arxiv.org/abs/1609.02907)|
+|Neural Collaborative Filtering|[He, Xiangnan, et al. "Neural collaborative filtering", 2017.](https://dl.acm.org/doi/pdf/10.1145/3038912.3052569?casa_token=oEkUs-uK75EAAAAA:UAomJ1kzS9s3Mo8tTg7eoOmZo713fSxhr1wdX9i56MHZ-foO1WfEfHIkCVcw_T464oERdPbFm6sJdPs)|
 |SASRec|[W. Kang and J. McAuley, "Self-Attentive Sequential Recommendation," 2018.](https://arxiv.org/abs/1808.09781)|
 
 
@@ -27,12 +26,11 @@ The Hyperparameters for each model are in [`model.ini`](https://github.com/Harde
 
 | Model     | mAP@k | nDCG@k | HR@k  |
 |-----------|-------|--------|-------|
-| FM        | 0.316 | 0.402  | 0.684 |
-| Wide&Deep | 0.272 | 0.351  | 0.612 |
-| NCF       | 0.312 | 0.396  | 0.667 |
-| NFM       | 0.304 | 0.390  | 0.671 |
-| DeepFM    | 0.317 | 0.402  | 0.678 |
-| xDeepFM   | 0.310 | 0.395  | 0.669 |
+| FM        | 0.353 | 0.439  | 0.716 |
+| FFM       | 0.355 | 0.441  | 0.717 |
+| Wide&Deep | 0.306 | 0.389  | 0.659 |
+| DeepFM    | 0.341 | 0.424  | 0.693 |
+| NCF       | 0.339 | 0.422  | 0.692 |
 | SASRec    | 0.478 | 0.554  | 0.797 |
 
 
@@ -54,8 +52,6 @@ The Hyperparameters for each model are in [`model.ini`](https://github.com/Harde
   ```python main.py --model=nfm --dataset=ml-1m --top_k=10```
 - DeepFM
   ```python main.py --model=dfm --dataset=ml-1m --top_k=10```
-- xDeepFm
-  ```python main.py --model=xdfm --dataset=ml-1m --top_k=10```
 - SASRec
   ```python main_sasrec.py --model=sasrec --dataset=ml-1m --top_k=10```
 

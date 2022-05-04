@@ -2,6 +2,7 @@ import random
 import numpy as np 
 import pandas as pd
 from collections import defaultdict
+import torch
 from torch.utils.data import Dataset
 
 
@@ -73,42 +74,28 @@ class MovieLens1M_Data(object):
         test = data.loc[data['rank_latest'] == 1]
         assert train['userId'].nunique()==valid['userId'].nunique()==test['userId'].nunique(), 'Not Match Train User, Valid User with Test User'
         return train.iloc[:,:3].to_numpy(), valid.iloc[:,:3].to_numpy(), test.iloc[:,:3].to_numpy()
-    
-    def _leave_one_out(self, data):
-        """
-        leave-one-out evaluation protocol in paper https://www.comp.nus.edu.sg/~xiangnan/papers/ncf.pdf
-        """
-        data['rank_latest'] = data.groupby(['userId'])['timestamp'].rank(method='first', ascending=False).astype(int)
-        train = data.loc[data['rank_latest'] > 2]
-        valid = data.loc[data['rank_latest'] == 2]
-        test = data.loc[data['rank_latest'] == 1]
-        assert train['userId'].nunique()==valid['userId'].nunique()==test['userId'].nunique(), 'Not Match Train User, Valid User with Test User'
-        return train.iloc[:,:3].to_numpy(), valid.iloc[:,:3].to_numpy(), test.iloc[:,:3].to_numpy()
-    
-    
-    
-    
+        
     def _get_positive_items(self, data):
         positive_items = defaultdict(set)
         for row in data.itertuples():
             positive_items[row.userId].add(row.movieId)
         return positive_items
     
-    def _get_dataset(self, data, num_neg):
+    def _get_dataset(self, data, num_neg, negative_sampling=True):
         return MovieLens_Dataset(data=data,
                                  item_pool=self.item_pool,
                                  positive_items=self.positive_items,
-                                 negative_sampling=self.negative_sampling,
+                                 negative_sampling=negative_sampling,
                                  num_neg=num_neg)
     
     def get_train_dataset(self):
-        return self._get_dataset(self.train_data, self.num_neg)
+        return self._get_dataset(self.train_data, self.num_neg, self.negative_sampling)
         
     def get_valid_dataset(self):
-        return self._get_dataset(self.valid_data, self.num_neg_test)
+        return self._get_dataset(self.valid_data, self.num_neg_test, True)
         
     def get_test_dataset(self):
-        return self._get_dataset(self.test_data, self.num_neg_test)
+        return self._get_dataset(self.test_data, self.num_neg_test, True)
         
 
 class MovieLens20M_Data(MovieLens1M_Data):
@@ -158,7 +145,7 @@ class MovieLens_Dataset(Dataset):
         """
         
         if not self.negative_sampling:
-            return [self.data[index][0], self.data[index][1]], self.data[index][2]
+            return torch.LongTensor([self.data[index][0], self.data[index][1]]), torch.LongTensor(1)
         
         user = self.data[index][0]
         users = np.array([user] * (self.num_neg + 1), dtype=np.int32)
@@ -171,4 +158,4 @@ class MovieLens_Dataset(Dataset):
         
         items = np.c_[users, movies] # concatenate
     
-        return items, ratings
+        return torch.LongTensor(items), torch.LongTensor(ratings)

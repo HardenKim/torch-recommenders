@@ -9,7 +9,7 @@ from datasets.movielens_sasrec import MovieLens1M_Data
 class KMRD2M_Data(MovieLens1M_Data):
     
     def __init__(self,
-                 path='../data/kmrd/rates-2m.csv',
+                 path='../data/kmrd-2m/rates-2m.csv',
                  min_rating=0,
                  max_len=50,
                  num_neg_test=100

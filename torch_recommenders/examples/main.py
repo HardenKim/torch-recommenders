@@ -8,15 +8,14 @@ import ast
 from tqdm import tqdm
 import numpy as np
 import torch
-from torch.utils.data import Subset
+
 from datasets.movielens import *
 from datasets.kmrd import *
 from models.FM import *
 from models.NCF import *
 from models.Wide_Deep import *
-from models.NFM import *
 from models.DeepFM import *
-from models.xDeepFM import *
+from models.FFM import *
 from utils.evaluation import *
 from utils.EarlyStopper import *
 
@@ -26,7 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42, 
         help="Random Seed.")
-    parser.add_argument('--epochs', type=int, default=200,
+    parser.add_argument('--epochs', type=int, default=100,
         help='Number of epochs to train.')
     parser.add_argument('--batch_size', type=int, default=2048,
         help='Number of batch size for training.')
@@ -46,6 +45,8 @@ def parse_args():
         help='Disables CUDA training.')
     parser.add_argument("--gpu", type=str, default="0",
         help="GPU Card ID.")
+    parser.add_argument("--save_dir", type=str, default="best_model",
+        help=".")
     
     return parser.parse_args()
 
@@ -79,34 +80,25 @@ def get_model(name, field_dims):
     if name == 'fm':
         return FactorizationMachineModel(field_dims,
                                          embed_dim=int(config_model['embed_dim']))
+    elif name == 'ffm':
+            return FieldAwareFactorizationMachineModel(field_dims,
+                                                       embed_dim=int(config_model['embed_dim']))
     elif name == 'wd':
         return WideAndDeepModel(field_dims,
                                 embed_dim=int(config_model['embed_dim']), 
                                 mlp_dims=ast.literal_eval(config_model['mlp_dims']), 
                                 dropout=float(config_model['dropout']))
-    elif name == 'ncf':
-        return NeuralCollaborativeFiltering(field_dims,
-                                            embed_dim=int(config_model['embed_dim']),
-                                            mlp_dims=ast.literal_eval(config_model['mlp_dims']),
-                                            dropout=float(config_model['dropout']))
-    elif name == 'nfm':
-        return NeuralFactorizationMachineModel(field_dims,
-                                               embed_dim=int(config_model['embed_dim']),
-                                               mlp_dims=ast.literal_eval(config_model['mlp_dims']),
-                                               dropouts=ast.literal_eval(config_model['dropouts']))
     elif name == 'dfm':
         return DeepFactorizationMachineModel(field_dims,
                                              embed_dim=int(config_model['embed_dim']),
                                              mlp_dims=ast.literal_eval(config_model['mlp_dims']),
                                              dropout=float(config_model['dropout']))
-    elif name == 'xdfm':
-        return ExtremeDeepFactorizationMachineModel(field_dims,
-                                                    embed_dim=int(config_model['embed_dim']),
-                                                    mlp_dims=ast.literal_eval(config_model['mlp_dims']),
-                                                    cross_layer_sizes=ast.literal_eval(config_model['mlp_dims']),
-                                                    dropout=float(config_model['dropout']),
-                                                    split_half=False)
-    
+    elif name == 'ncf':
+        return NeuralCollaborativeFiltering(field_dims,
+                                            embed_dim=int(config_model['embed_dim']),
+                                            mlp_dims=ast.literal_eval(config_model['mlp_dims']),
+                                            dropout=float(config_model['dropout']))
+        
 def train(model, optimizer, data_loader, criterion, device):
     model.train()
     total_loss = 0
@@ -161,7 +153,7 @@ if __name__ == '__main__':
         test_batch_size = 1
     else:
         train_batch_size = args.batch_size
-        test_batch_size = int(config_dataset['num_neg']) + 1
+        test_batch_size = 1
     train_data_loader = torch.utils.data.DataLoader(train_dataset,
                                                     batch_size=train_batch_size,
                                                     shuffle=True, 
@@ -179,24 +171,22 @@ if __name__ == '__main__':
     # print(f"model: \n {model}")
     # print("="*50)
     criterion = torch.nn.BCELoss().to(device)
-    optimizer = torch.optim.Adam(params=model.parameters(), 
-                                 lr=float(config_model['learning_rate']), 
+    optimizer = torch.optim.Adam(params=model.parameters(),
+                                 lr=float(config_model['learning_rate']),
                                  weight_decay=float(config_model['weight_decay']))
     
-    # early_stopper = EarlyStopper(num_trials=5, direction='maximize' ,save_path=f'{args.save_dir}/{args.model}.pt')
-    early_stopper = EarlyStopper(num_trials=2, direction='maximize')
+    early_stopper = EarlyStopper(num_trials=5, direction='maximize', save_path=f'{args.save_dir}/{args.model}.pt')
+    # early_stopper = EarlyStopper(num_trials=2, direction='maximize')
     tk0 = tqdm(range(1, args.epochs+1), smoothing=0, mininterval=1.0)
     for epoch in tk0:
         loss = train(model, optimizer, train_data_loader, criterion, device)
         tk0.set_postfix(loss=loss)
+        metrics = test(model, valid_data_loader, data.num_users, device)
+        if not early_stopper.is_continuable(model, metrics[1]):
+            break
         if epoch % 10 == 0:
-            metrics = test(model, valid_data_loader, data.num_users, device)
             print(f"[Valid] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
-            if not early_stopper.is_continuable(model, metrics[1]):
-                print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
-                break
-    else: 
-        print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
-    
-    metrics = test(model, test_data_loader, data.num_users, device)        
-    print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")  
+    print(f'[Valid] Best nDCG@K: {early_stopper.best_metric:.3f}')
+    model = torch.load(f'{args.save_dir}/{args.model}.pt')
+    metrics = test(model, test_data_loader, data.num_users, device)
+    print(f"[Test] mAP@K: {metrics[0]:.3f}, nDCG@K: {metrics[1]:.3f}, HR@K:{metrics[2]:.3f}")
