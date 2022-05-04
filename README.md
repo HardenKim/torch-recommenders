@@ -10,9 +10,9 @@ Recommendation System Models by Pytorch
 |Field-aware Factorization Machines|[Y Juan, et al. "Field-aware Factorization Machines for CTR Prediction", 2015.](https://www.csie.ntu.edu.tw/~cjlin/papers/ffm.pdf)|
 |Wide&Deep|[HT Cheng, et al. "Wide & Deep Learning for Recommender Systems", 2016.](https://arxiv.org/abs/1606.07792)|
 |DeepFM|[H Guo, et al. "DeepFM: A Factorization-Machine based Neural Network for CTR Prediction", 2017.](https://arxiv.org/abs/1703.04247)|
-|GCN|[Kipf & Welling. "Semi-Supervised Classification with Graph Convolutional Networks", 2016.](https://arxiv.org/abs/1609.02907)|
+|Graph Convolutional Networks|[Kipf & Welling. "Semi-Supervised Classification with Graph Convolutional Networks", 2016.](https://arxiv.org/abs/1609.02907)|
 |Neural Collaborative Filtering|[He, Xiangnan, et al. "Neural collaborative filtering", 2017.](https://dl.acm.org/doi/pdf/10.1145/3038912.3052569?casa_token=oEkUs-uK75EAAAAA:UAomJ1kzS9s3Mo8tTg7eoOmZo713fSxhr1wdX9i56MHZ-foO1WfEfHIkCVcw_T464oERdPbFm6sJdPs)|
-|SASRec|[W. Kang and J. McAuley, "Self-Attentive Sequential Recommendation," 2018.](https://arxiv.org/abs/1808.09781)|
+|Self-Attentive Sequential Recommendation|[W. Kang and J. McAuley, "Self-Attentive Sequential Recommendation", 2018.](https://arxiv.org/abs/1808.09781)|
 
 
 ## Model Comparison
@@ -30,7 +30,7 @@ The Hyperparameters for each model are in [`model.ini`](https://github.com/Harde
 | FFM       | 0.355 | 0.441  | 0.717 |
 | Wide&Deep | 0.306 | 0.389  | 0.659 |
 | DeepFM    | 0.341 | 0.424  | 0.693 |
-| NCF       | 0.339 | 0.422  | 0.692 |
+| NeuMF     | 0.339 | 0.422  | 0.692 |
 | SASRec    | 0.478 | 0.554  | 0.797 |
 
 
